@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        .slider-container {
+            position: relative;
+            max-width: 800px;
+            margin: auto;
+            overflow: hidden; /* Ensure that the slider doesn't overflow its container */
+        }
+
+        .slider {
+            display: flex;
+            transition: transform 0.5s ease; /* Add transition for smooth sliding effect */
+        }
+
+        .slider img {
+            width: 100%;
+            height: auto;
+            display: none; /* Hide all images by default */
+        }
+
+        .slider img.active {
+            display: block; /* Only display the active image */
+        }
+
+        .prev, .next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            z-index: 1;
+        }
+
+        .prev {
+            left: 0;
+        }
+
+        .next {
+            right: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="slider-container" onmouseover="stopAutoSlide()" onmouseout="startAutoSlide()">
+        <div class="slider">
+            <img src="download.jpg" alt="Image 1" class="active">
+            <img src="download (11).jpg" alt="Image 2">
+            <img src="download-2.jpg" alt="Image 3">
+            <img src="images.jpg" alt="Image 4">
+            <img src="images-1.jpg" alt="Image 5">
+        </div>
+        <button class="prev" onclick="prevSlide()">&#10094;</button>
+        <button class="next" onclick="nextSlide()">&#10095;</button>
+    </div>
+
+    <script>
+        let slideIndex = 0;
+        const slides = document.querySelectorAll('.slider img');
+        const totalSlides = slides.length;
+        let autoSlideInterval;
+
+        function showSlide(n) {
+            slideIndex = (n + totalSlides) % totalSlides; 
+            for (let i = 0; i < slides.length; i++) {
+                slides[i].classList.remove('active');
+            }
+            slides[slideIndex].classList.add('active');
+        }
+
+        function nextSlide() {
+            showSlide(slideIndex + 1);
+        }
+
+        function prevSlide() {
+            showSlide(slideIndex - 1);
+        }
+
+        function startAutoSlide() {
+            autoSlideInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds (5000 milliseconds)
+        }
+
+        function stopAutoSlide() {
+            clearInterval(autoSlideInterval);
+        }
+
+        startAutoSlide(); // Start automatic sliding initially
+
+    </script>
+</body>
+</html>
