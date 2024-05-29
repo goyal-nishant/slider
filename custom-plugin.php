@@ -280,18 +280,15 @@ function display_user_list()
     var selectUserColumnHeader = document.getElementById('selectedUser');
 
     document.getElementById('selectUser').addEventListener('click', function() {
-        // Toggle the display of checkboxes and the mail form
         var checkboxes = document.querySelectorAll('.selectUserCheckbox');
         checkboxes.forEach(function(checkbox) {
             checkbox.parentElement.style.display = userColumnDisplayed ? 'none' : 'block';
         });
         document.getElementById('sendMailForm').style.display = userColumnDisplayed ? 'none' : 'block';
 
-        // Toggle the display of the select user column header
         selectUserColumnHeader.style.display = userColumnDisplayed ? 'none' : 'table-cell';
         userColumnDisplayed = !userColumnDisplayed;
 
-        // Hide the new user form if displayed
         if (newUserFormDisplayed) {
             document.getElementById('newUserForm').style.display = 'none';
             newUserFormDisplayed = false;
@@ -302,7 +299,6 @@ function display_user_list()
         document.getElementById('newUserForm').style.display = newUserFormDisplayed ? 'none' : 'block';
         newUserFormDisplayed = !newUserFormDisplayed;
 
-        // Hide the mail form if displayed
         document.getElementById('sendMailForm').style.display = 'none';
         userColumnDisplayed = false;
     });
@@ -326,17 +322,25 @@ function handle_new_user_submission()
     $name = sanitize_text_field($_POST['name']);
     $email = sanitize_email($_POST['email']);
     $password = $_POST['password'];
-    $wpdb->insert(
-        $table_name,
-        array(
-            'name' => $name,
-            'email' => $email,
-            'password' => $password,
-        )
-    );
 
-    wp_redirect(admin_url('admin.php?page=user-list'));
-    exit;
+    $existing_user_custom_table = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE email = %s", $email));
+    $existing_user_wp_users = get_user_by('email', $email);
+
+    if (!$existing_user_custom_table && !$existing_user_wp_users) {
+        $wpdb->insert(
+            $table_name,
+            array(
+                'name' => $name,
+                'email' => $email,
+                'password' => $password,
+            )
+        );
+
+        wp_redirect(admin_url('admin.php?page=user-list'));
+        exit;
+    } else {
+        echo '<div class="error"><p>User with this email already exists.</p></div>';
+    }
 }
 
 function customPlugin_activate()
@@ -365,7 +369,6 @@ if (isset($_POST['sendEmailBtn'])) {
 
 function send_email_to_selected_users()
 {
-    // Ensure WordPress is fully loaded
     if (!function_exists('get_user_by')) {
         require_once ABSPATH . 'wp-includes/pluggable.php';
     }
@@ -376,9 +379,8 @@ function send_email_to_selected_users()
     $subject = $_POST['emailSubject'];
     $body = $_POST['emailBody'];
 
-    $mail = new PHPMailer(true);
+    $mail = new PHPMailer(true);    
     try {
-        // Server settings
         $mail->SMTPDebug = SMTP::DEBUG_OFF; 
         $mail->isSMTP();
         $mail->Host       = 'sandbox.smtp.mailtrap.io'; 
@@ -388,23 +390,21 @@ function send_email_to_selected_users()
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
         $mail->Port       = 2525; 
 
-        
         $mail->setFrom('from@example.com', 'Mailer');
         foreach ($selected_users as $user_id) {
             $user = get_user_by('ID', $user_id);
             $mail->addAddress($user->user_email, $user->display_name);
         }
 
-        // Content
         $mail->isHTML(true); 
         $mail->Subject = $subject;
-        $mail->Body    = $body;
+        $mail->Body    = "Subject: " . $subject . "<br>" . "Body: " .$body  ;
 
         $mail->send();
-        echo 'Message has been sent';
+
+        //echo 'Message has been sent';
     } catch (Exception $e) {
         echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
     }
 }
-
 ?>
