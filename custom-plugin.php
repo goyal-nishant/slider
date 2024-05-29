@@ -16,79 +16,150 @@
  * Domain Path:       /languages
  */
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\SMTP;
 
+require_once(ABSPATH . 'vendor/autoload.php');
 
- /**
+$mail = new PHPMailer(true);
+
+/**
  * Register the "book" custom post type
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly
 }
-
 
 require_once(plugin_dir_path(__FILE__) . 'includes/activation.php');
 require_once(plugin_dir_path(__FILE__) . 'includes/deactivation.php');
 
 // Activate the plugin.
-register_activation_hook( __FILE__, 'customPlugin_activate' );
- 
+register_activation_hook(__FILE__, 'customPlugin_activate');
+
 //Deactivation hook.
 register_deactivation_hook(__FILE__, 'customPlugin_deactivate');
 
+// Check if the taxonomy exists before registering it
+if (!taxonomy_exists('course')) {
+    // Register custom taxonomy
+    function register_course_taxonomy()
+    {
+        $labels = array(
+            'name'              => _x('Courses', 'taxonomy general name'),
+            'singular_name'     => _x('Course', 'taxonomy singular name'),
+            'search_items'      => __('Search Courses'),
+            'all_items'         => __('All Courses'),
+            'parent_item'       => __('Parent Course'),
+            'parent_item_colon' => __('Parent Course:'),
+            'edit_item'         => __('Edit Course'),
+            'update_item'       => __('Update Course'),
+            'add_new_item'      => __('Add New Course'),
+            'new_item_name'     => __('New Course Name'),
+            'menu_name'         => __('Course'),
+        );
+        $args   = array(
+            'hierarchical'      => true,
+            'labels'            => $labels,
+            'show_ui'           => true,
+            'show_admin_column' => true,
+            'query_var'         => true,
+            'rewrite'           => ['slug' => 'course'],
+        );
+        register_taxonomy('course', ['book'], $args);
+    }
+    add_action('init', 'register_course_taxonomy');
+}
 
-function customPlugin_settings_page() {
-    ?>
+// Add meta boxes
+function add_custom_meta_box()
+{
+    $post_types = ['post', 'book'];
+    add_meta_box(
+        'custom_meta_box_id',
+        'My Custom Meta Box',
+        'render_custom_meta_box_callback',
+        $post_types,
+        'normal',
+        'default'
+    );
+}
+add_action('add_meta_boxes', 'add_custom_meta_box');
+
+function render_custom_meta_box_callback($post)
+{
+    echo '<label for="custom_field">My Custom Field </label>';
+    echo '<input type="text" id="custom_field" name="custom_field" value="" placeholder = "Enter your meta data" />';
+}
+
+function save_custom_meta_data($post_id)
+{
+    if (array_key_exists('custom_field', $_POST)) {
+        update_post_meta(
+            $post_id,
+            'custom_field',
+            sanitize_text_field($_POST['custom_field'])
+        );
+    }
+}
+add_action('save_post', 'save_custom_meta_data');
+
+// regsiter_setting into database
+function customPlugin_settings_init()
+{
+    register_setting('my_plugin_settings_group', 'custom_plugin_menu_option');
+    register_setting('my_plugin_settings_group', 'custom_plugin_another_option');
+
+    add_settings_section('customPlugin_settings_section', 'Custom Settings', '', 'my_plugin_settings_group');
+
+    add_settings_field('custom_plugin_menu_option', 'Custom Menu Option', 'customPlugin_render_menu_option_field', 'my_plugin_settings_group', 'customPlugin_settings_section');
+    add_settings_field('custom_plugin_another_option', 'Another Option', 'customPlugin_render_another_option_field', 'my_plugin_settings_group', 'customPlugin_settings_section');
+}
+function customPlugin_render_menu_option_field()
+{
+    $value = get_option('custom_plugin_menu_option');
+    echo '<input type="text" name="custom_plugin_menu_option" value="" placeholder = "' . esc_attr($value) . '" />';
+}
+function customPlugin_render_another_option_field()
+{
+    $value = get_option('custom_plugin_another_option');
+    echo '<input type="text" name="custom_plugin_another_option" value="" placeholder="' . esc_attr($value) . '" />';
+}
+add_action('admin_menu', 'customPlugin_add_settings_page');
+function customPlugin_add_settings_page()
+{
+    add_options_page('Custom Plugin Settings', 'Custom Plugin', 'manage_options', 'custom-plugin-settings', 'customPlugin_settings_page');
+}
+function customPlugin_settings_page()
+{
+?>
     <div class="wrap">
         <h2>Custom Plugin Settings</h2>
         <form method="post" action="options.php">
             <?php settings_fields('my_plugin_settings_group'); ?>
             <?php do_settings_sections('my_plugin_settings_group'); ?>
-            <table class="form-table">
-                <tr valign="top">
-                    <th scope="row">Custom Menu Option</th>
-                    <td><input type="text" name="custom_plugin_menu_option" value="<?php echo esc_attr(get_option('custom_plugin_menu_option')); ?>" /></td>
-                </tr>
-            </table>
             <?php submit_button(); ?>
         </form>
     </div>
-    <?php
-}
-
-function customPlugin_settings_init() {
-    add_settings_section('customPlugin_settings_section', 'Custom Plugin Settings', '', 'my_plugin_settings_group');
-    add_settings_field('custom_plugin_menu_option', 'Custom Menu Option', 'customPlugin_render_menu_option_field', 'my_plugin_settings_group', 'customPlugin_settings_section');
-}
-
-function customPlugin_render_menu_option_field() {
-    $value = get_option('custom_plugin_menu_option');
-    echo '<input type="text" name="custom_plugin_menu_option" value="' . esc_attr($value) . '" />';
-}
-
-add_action('admin_menu', 'customPlugin_add_settings_page');
-function customPlugin_add_settings_page() {
-    add_options_page('Custom Plugin Settings', 'Custom Plugin', 'manage_options', 'custom-plugin-settings', 'customPlugin_settings_page');
+<?php
 }
 add_action('admin_init', 'customPlugin_settings_init');
 
-
-
-// add user list 
+// add user list
 add_action('admin_menu', 'custom_plugin_menu');
-
-// Function to create a new admin menu
-function custom_plugin_menu() {
+function custom_plugin_menu()
+{
     add_menu_page(
-        'User List',         // Page title
-        'User List',         // Menu title
-        'manage_options',    // Capability
-        'user-list',         // Menu slug
-        'display_user_list'  // Function to display the page content
+        'User List',
+        'User List',
+        'manage_options',
+        'user-list',
+        'display_user_list'
     );
 }
 
-// Function to fetch users
-function fetch_users() {
+function fetch_users()
+{
     $args = array(
         'role__in' => ['administrator', 'editor', 'author', 'contributor', 'subscriber'],
         'orderby' => 'ID',
@@ -99,29 +170,37 @@ function fetch_users() {
     return $users;
 }
 
-// Function to display user list
-function display_user_list() {
-    // Check if the form is submitted
+function display_user_list()
+{
     if (isset($_POST['submit_new_user'])) {
-        // Handle form submission
         handle_new_user_submission();
     }
 
-    // Fetch WordPress users
     $wordpress_users = fetch_users();
 
-    // Fetch data from the contact_list_with_password table
     global $wpdb;
     $table_name = $wpdb->prefix . 'contact_list_with_password';
     $contact_list = $wpdb->get_results("SELECT * FROM $table_name");
-
-    ?>
+?>
     <div class="wrap">
         <h1 class="wp-heading-inline">User List</h1>
-        <!-- Add New User Button -->
         <button id="showFormBtn" class="page-title-action">Add New User</button>
+        <button id="selectUser" class="page-title-action">Select user</button>
 
-        <!-- New User Form -->
+        <!-- send mail -->
+        <div id="sendMailForm" style="display:none;" class="wrap">
+            <h2>Send Email to Selected Users</h2>
+            <form id="sendMailForm" method="post" action="">
+                <input type="hidden" name="selected_users" id="selectedUsers" value="">
+                <label for="emailSubject">Subject:</label><br>
+                <input type="text" id="emailSubject" name="emailSubject" required><br>
+                <label for="emailBody">Body:</label><br>
+                <textarea id="emailBody" name="emailBody" rows="4" cols="50" required></textarea><br>
+                <input type="submit" value="Send Email" id="sendEmailBtn" name="sendEmailBtn">
+            </form>
+        </div>
+
+
         <div id="newUserForm" style="display:none;" class="wrap">
             <h2>Add New User</h2>
             <form method="post" action="" class="validate">
@@ -160,27 +239,33 @@ function display_user_list() {
             </form>
         </div>
 
-        <!-- User List Table -->
         <table class="wp-list-table widefat fixed striped users">
             <thead>
                 <tr>
+                    <th style="display:none;" id="selectedUser">Select User</th>
                     <th scope="col" id="username" class="manage-column column-username">Username</th>
                     <th scope="col" id="email" class="manage-column column-email">Email</th>
                 </tr>
             </thead>
+
             <tbody>
-                <?php 
-                // Display WordPress users
+                <?php
                 foreach ($wordpress_users as $user) : ?>
                     <tr>
+                        <td style="display:none;">
+                            <input type="checkbox" class="selectUserCheckbox" name="selected_user[]" value="<?php echo esc_attr($user->ID); ?>">
+                        </td>
                         <td class="username"><?php echo esc_html($user->user_login); ?></td>
                         <td class="email"><?php echo esc_html($user->user_email); ?></td>
                     </tr>
-                <?php endforeach; 
 
-                // Display users from contact_list_with_password table
+                <?php endforeach;
+
                 foreach ($contact_list as $contact) : ?>
                     <tr>
+                        <td style="display:none;">
+                            <input type="checkbox" class="selectUserCheckbox" name="selected_user[]" value="<?php echo esc_attr($contact->id); ?>">
+                        </td>
                         <td class="username"><?php echo esc_html($contact->name); ?></td>
                         <td class="email"><?php echo esc_html($contact->email); ?></td>
                     </tr>
@@ -190,23 +275,57 @@ function display_user_list() {
     </div>
 
     <script>
-        document.getElementById('showFormBtn').addEventListener('click', function() {
-            document.getElementById('newUserForm').style.display = 'block';
+        var newUserFormDisplayed = false;
+    var userColumnDisplayed = false;
+    var selectUserColumnHeader = document.getElementById('selectedUser');
+
+    document.getElementById('selectUser').addEventListener('click', function() {
+        // Toggle the display of checkboxes and the mail form
+        var checkboxes = document.querySelectorAll('.selectUserCheckbox');
+        checkboxes.forEach(function(checkbox) {
+            checkbox.parentElement.style.display = userColumnDisplayed ? 'none' : 'block';
+        });
+        document.getElementById('sendMailForm').style.display = userColumnDisplayed ? 'none' : 'block';
+
+        // Toggle the display of the select user column header
+        selectUserColumnHeader.style.display = userColumnDisplayed ? 'none' : 'table-cell';
+        userColumnDisplayed = !userColumnDisplayed;
+
+        // Hide the new user form if displayed
+        if (newUserFormDisplayed) {
+            document.getElementById('newUserForm').style.display = 'none';
+            newUserFormDisplayed = false;
+        }
+    });
+
+    document.getElementById('showFormBtn').addEventListener('click', function() {
+        document.getElementById('newUserForm').style.display = newUserFormDisplayed ? 'none' : 'block';
+        newUserFormDisplayed = !newUserFormDisplayed;
+
+        // Hide the mail form if displayed
+        document.getElementById('sendMailForm').style.display = 'none';
+        userColumnDisplayed = false;
+    });
+        document.getElementById('sendEmailBtn').addEventListener('click', function(event) {
+            var selectedUsers = [];
+            var checkboxes = document.querySelectorAll('.selectUserCheckbox:checked');
+            checkboxes.forEach(function(checkbox) {
+                selectedUsers.push(checkbox.value);
+            });
+            document.getElementById('selectedUsers').value = JSON.stringify(selectedUsers);
         });
     </script>
-    <?php
+<?php
 }
 
-function handle_new_user_submission() {
+function handle_new_user_submission()
+{
     global $wpdb;
     $table_name = $wpdb->prefix . 'contact_list_with_password';
 
-    // Get form data
     $name = sanitize_text_field($_POST['name']);
     $email = sanitize_email($_POST['email']);
-    $password = $_POST['password']; // In a real-world scenario, make sure to properly hash the password
-
-    // Insert data into the database
+    $password = $_POST['password'];
     $wpdb->insert(
         $table_name,
         array(
@@ -216,20 +335,17 @@ function handle_new_user_submission() {
         )
     );
 
-    // Redirect after submission (optional)
     wp_redirect(admin_url('admin.php?page=user-list'));
     exit;
 }
 
-
-// Create contact list with password table on activation
-function customPlugin_activate() {
+function customPlugin_activate()
+{
     global $wpdb;
     $table_name_with_password = $wpdb->prefix . 'contact_list_with_password';
     $charset_collate = $wpdb->get_charset_collate();
 
-    // Check if the table already exists
-    if($wpdb->get_var("SHOW TABLES LIKE '$table_name_with_password'") != $table_name_with_password) {
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name_with_password'") != $table_name_with_password) {
         $sql = "CREATE TABLE $table_name_with_password (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             name tinytext NOT NULL,
@@ -240,6 +356,54 @@ function customPlugin_activate() {
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+    }
+}
+
+if (isset($_POST['sendEmailBtn'])) {
+    send_email_to_selected_users();
+}
+
+function send_email_to_selected_users()
+{
+    // Ensure WordPress is fully loaded
+    if (!function_exists('get_user_by')) {
+        require_once ABSPATH . 'wp-includes/pluggable.php';
+    }
+
+    $selected_users_json = $_POST['selected_users'];
+    $selected_users = json_decode($selected_users_json);
+
+    $subject = $_POST['emailSubject'];
+    $body = $_POST['emailBody'];
+
+    $mail = new PHPMailer(true);
+    try {
+        // Server settings
+        $mail->SMTPDebug = SMTP::DEBUG_OFF; 
+        $mail->isSMTP();
+        $mail->Host       = 'sandbox.smtp.mailtrap.io'; 
+        $mail->SMTPAuth   = true; 
+        $mail->Username   = '05ee71512c7caa'; 
+        $mail->Password   = 'cbf4265255585e'; 
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; 
+        $mail->Port       = 2525; 
+
+        
+        $mail->setFrom('from@example.com', 'Mailer');
+        foreach ($selected_users as $user_id) {
+            $user = get_user_by('ID', $user_id);
+            $mail->addAddress($user->user_email, $user->display_name);
+        }
+
+        // Content
+        $mail->isHTML(true); 
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+
+        $mail->send();
+        echo 'Message has been sent';
+    } catch (Exception $e) {
+        echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
     }
 }
 
